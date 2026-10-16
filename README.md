@@ -48,6 +48,22 @@ is ignored — the app builds its own queries.
 4. Open http://127.0.0.1:5000, paste your Client ID and Secret, and click
    **Connect with Spotify**.
 
+### Run it again later
+
+After the one-time setup, every time you want to use the app:
+
+```bash
+cd spotify-playlist-maker
+source .venv/bin/activate
+python app.py
+```
+
+Then open http://127.0.0.1:5000 in your browser. Stop the server with Ctrl+C.
+
+You do **not** need to repeat the venv creation, `pip install`, or credential
+entry — your Client ID/Secret and Spotify login are saved locally in
+`spotify_maker.json`, and the login is refreshed automatically when it expires.
+
 ## Notes
 
 - Your credentials and Spotify tokens live in `spotify_maker.json`, which is
