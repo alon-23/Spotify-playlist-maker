@@ -9,7 +9,7 @@ import config
 import csv_tracks
 import spotify
 
-REDIRECT_URI = "http://localhost:5000/callback"
+REDIRECT_URI = "http://127.0.0.1:5000/callback"
 SEARCH_DELAY_SECONDS = 0.2
 
 app = Flask(__name__)

@@ -31,7 +31,11 @@ is ignored — the app builds its own queries.
 
 1. Go to https://developer.spotify.com/dashboard and create an app.
 2. In the app settings, add this Redirect URI exactly:
-   `http://localhost:5000/callback`
+   `http://127.0.0.1:5000/callback`
+
+   Spotify rejects `http://localhost` and any plain `http://` URL. Only loopback
+   IP literals (`127.0.0.1` / `[::1]`) are allowed over http, so use `127.0.0.1`,
+   not `localhost`.
 3. Install and run:
 
    ```bash
@@ -41,7 +45,7 @@ is ignored — the app builds its own queries.
    python app.py
    ```
 
-4. Open http://localhost:5000, paste your Client ID and Secret, and click
+4. Open http://127.0.0.1:5000, paste your Client ID and Secret, and click
    **Connect with Spotify**.
 
 ## Notes
