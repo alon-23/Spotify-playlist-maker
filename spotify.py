@@ -100,12 +100,16 @@ def create_playlist(access_token, name, public=False):
     return api_request("POST", f"{API_BASE}/me/playlists", access_token, body)
 
 
+def unfollow_playlist(access_token, playlist_id):
+    api_request("DELETE", f"{API_BASE}/playlists/{playlist_id}/followers", access_token)
+
+
 def add_tracks(access_token, playlist_id, uris):
     for i in range(0, len(uris), BATCH_SIZE):
         chunk = uris[i : i + BATCH_SIZE]
         api_request(
             "POST",
-            f"{API_BASE}/playlists/{playlist_id}/tracks",
+            f"{API_BASE}/playlists/{playlist_id}/items",
             access_token,
             {"uris": chunk},
         )

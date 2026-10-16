@@ -39,6 +39,20 @@ def test_build_query():
     assert build_query({"track": "Dancing Queen", "artist": "ABBA"}) == '"Dancing Queen" "ABBA"'
 
 
+def test_add_tracks_uses_items_endpoint():
+    """Spotify's Feb 2026 migration: /tracks returns 403; must use /items."""
+    import spotify
+
+    calls = []
+    original = spotify.api_request
+    spotify.api_request = lambda method, url, token, body=None: calls.append(url)
+    try:
+        spotify.add_tracks("tok", "PID", ["spotify:track:a", "spotify:track:b"])
+    finally:
+        spotify.api_request = original
+    assert calls == ["https://api.spotify.com/v1/playlists/PID/items"], calls
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

@@ -146,12 +146,12 @@ def create_playlist():
         return jsonify({"error": "No matched tracks to add"}), 400
 
     try:
-        playlist = spotify.create_playlist(token, name)
-        spotify.add_tracks(token, playlist["id"], uris)
+        playlist = _create_and_fill(token, name, uris)
     except spotify.TokenExpired:
         token = _valid_token()
-        playlist = spotify.create_playlist(token, name)
-        spotify.add_tracks(token, playlist["id"], uris)
+        playlist = _create_and_fill(token, name, uris)
+    except RuntimeError as err:
+        return jsonify({"error": f"Created the playlist but adding tracks failed: {err}"}), 502
 
     return jsonify(
         {
@@ -160,6 +160,20 @@ def create_playlist():
             "url": playlist["external_urls"]["spotify"],
         }
     )
+
+
+def _create_and_fill(token, name, uris):
+    """Create the playlist, add tracks; roll back the empty playlist on failure."""
+    playlist = spotify.create_playlist(token, name)
+    try:
+        spotify.add_tracks(token, playlist["id"], uris)
+    except Exception:
+        try:
+            spotify.unfollow_playlist(token, playlist["id"])
+        except Exception:
+            pass
+        raise
+    return playlist
 
 
 def _search_url(row):
