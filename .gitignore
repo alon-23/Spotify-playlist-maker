@@ -3,3 +3,4 @@ spotify_maker.json
 __pycache__/
 *.pyc
 .DS_Store
+.opencode/
