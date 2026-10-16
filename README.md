@@ -8,7 +8,7 @@ finds, and lists anything it couldn't match so you can add it manually.
 
 1. You register a free Spotify Developer app, get a Client ID + Secret, and paste
    them into the app (stored locally, never committed).
-2. You log in with Spotify once (browser OAuth, redirects back to localhost).
+2. You log in with Spotify once (browser OAuth, redirects back to 127.0.0.1).
 3. You load your CSV, click **Find tracks**, review matches/misses, name your
    playlist, and click **Create playlist**.
 
