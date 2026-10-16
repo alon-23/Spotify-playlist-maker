@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spotify Playlist Maker</title>
+<style>
+  body { font: 15px/1.5 -apple-system, system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 16px; color: #111; }
+  h1 { font-size: 22px; }
+  section { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 16px 0; }
+  label { display: block; font-weight: 600; margin: 8px 0 4px; }
+  input, textarea, button { font: inherit; width: 100%; box-sizing: border-box; }
+  input, textarea { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+  button { width: auto; padding: 8px 16px; margin-top: 10px; border: 0; border-radius: 6px; background: #1db954; color: #fff; cursor: pointer; }
+  button.secondary { background: #eee; color: #111; }
+  button:disabled { opacity: .5; cursor: default; }
+  .muted { color: #666; font-size: 13px; }
+  .status { font-size: 13px; margin-top: 8px; }
+  .ok { color: #0a7d34; }
+  .err { color: #c0392b; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  th, td { text-align: left; border-bottom: 1px solid #eee; padding: 6px 4px; }
+  a { color: #1a73e8; }
+</style>
+</head>
+<body>
+<h1>Spotify Playlist Maker</h1>
+
+<section id="setup">
+  <strong>1. Spotify API credentials</strong>
+  <p class="muted">Create an app at developer.spotify.com, set its Redirect URI to
+    <code>http://localhost:5000/callback</code>, then paste the Client ID and Secret here.</p>
+  <label>Client ID</label>
+  <input id="client_id" autocomplete="off" />
+  <label>Client Secret</label>
+  <input id="client_secret" type="password" autocomplete="off" />
+  <button onclick="saveConfig()">Save</button>
+  <button class="secondary" onclick="connect()">Connect with Spotify</button>
+  <div class="status" id="setup_status"></div>
+</section>
+
+<section id="build">
+  <strong>2. Load CSV &amp; build playlist</strong>
+  <label>CSV file</label>
+  <input type="file" id="csv_file" accept=".csv" onchange="loadFile(event)" />
+  <label>…or paste CSV</label>
+  <textarea id="csv_text" rows="6" placeholder="Track,Artist,Album,Spotify Search URL"></textarea>
+  <label>Playlist name</label>
+  <input id="playlist_name" placeholder="My Playlist" />
+  <button onclick="runImport()" id="import_btn">Find tracks</button>
+  <div class="status" id="import_status"></div>
+</section>
+
+<section id="results" style="display:none">
+  <strong id="results_title"></strong>
+  <div id="results_body"></div>
+  <button onclick="createPlaylist()" id="create_btn">Create playlist</button>
+  <div class="status" id="create_status"></div>
+</section>
+
+<script>
+let matched = [];
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  return { ok: res.ok, data: await res.json().catch(() => ({})) };
+}
+
+function setStatus(id, msg, cls) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = "status " + (cls || "");
+}
+
+async function refreshStatus() {
+  const { data } = await api("/api/status");
+  const parts = [];
+  if (!data.has_credentials) parts.push("Add your Client ID and Secret.");
+  else if (!data.connected) parts.push("Credentials saved — click Connect with Spotify.");
+  else parts.push("Connected to Spotify.");
+  setStatus("setup_status", parts.join(" "), data.connected ? "ok" : "");
+}
+
+async function saveConfig() {
+  const body = {
+    client_id: document.getElementById("client_id").value,
+    client_secret: document.getElementById("client_secret").value,
+  };
+  const { ok, data } = await api("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  setStatus("setup_status", ok ? "Saved." : data.error, ok ? "ok" : "err");
+  if (ok) refreshStatus();
+}
+
+function connect() { window.location.href = "/login"; }
+
+function loadFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById("csv_text").value = e.target.result;
+    const name = file.name.replace(/\.csv$/i, "");
+    document.getElementById("playlist_name").value = name;
+  };
+  reader.readAsText(file);
+}
+
+async function runImport() {
+  const csv = document.getElementById("csv_text").value.trim();
+  if (!csv) return setStatus("import_status", "Load or paste a CSV first.", "err");
+  const btn = document.getElementById("import_btn");
+  btn.disabled = true;
+  setStatus("import_status", "Searching Spotify… (this can take a moment)");
+  const { ok, data } = await api("/api/import", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv }),
+  });
+  btn.disabled = false;
+  if (!ok) return setStatus("import_status", data.error, "err");
+
+  matched = data.matched.map((m) => m.uri);
+  setStatus("import_status", `Matched ${data.matched.length} of ${data.total}.`, "ok");
+  renderResults(data);
+}
+
+function renderResults(data) {
+  document.getElementById("results").style.display = "block";
+  document.getElementById("results_title").textContent =
+    `Matched ${data.matched.length} of ${data.total} tracks`;
+  let html = "<table><tr><th>Match</th><th>Song</th></tr>";
+  for (const m of data.matched) {
+    html += `<tr><td>✓</td><td>${esc(m.matched_name)} — ${esc(m.matched_artist)}</td></tr>`;
+  }
+  for (const m of data.misses) {
+    html += `<tr><td class="err">✗</td><td>${esc(m.track)} — ${esc(m.artist)} ` +
+            `(<a href="${m.search_url}" target="_blank">search manually</a>)</td></tr>`;
+  }
+  html += "</table>";
+  document.getElementById("results_body").innerHTML = html;
+  if (!data.matched.length) {
+    document.getElementById("create_btn").disabled = true;
+  }
+}
+
+async function createPlaylist() {
+  const name = document.getElementById("playlist_name").value.trim() || "Imported Playlist";
+  const btn = document.getElementById("create_btn");
+  btn.disabled = true;
+  setStatus("create_status", "Creating playlist…");
+  const { ok, data } = await api("/api/create", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, uris: matched }),
+  });
+  btn.disabled = false;
+  if (!ok) return setStatus("create_status", data.error, "err");
+  setStatus("create_status", "", "");
+  document.getElementById("create_status").innerHTML =
+    `<span class="ok">Created “${esc(data.name)}” (${data.count} tracks).</span> ` +
+    `<a href="${data.url}" target="_blank">Open in Spotify</a>`;
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+refreshStatus();
+</script>
+</body>
+</html>
